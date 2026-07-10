@@ -1,0 +1,5 @@
+requests>=2.31
+anthropic>=0.40
+pyairtable>=2.3
+python-dotenv>=1.0
+pytest>=8.0

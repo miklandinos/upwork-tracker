@@ -1,0 +1,26 @@
+name: scan-upwork
+on:
+  schedule:
+    # Каждые 30 минут в UTC-окне, покрывающем 11:00–02:00 по Таиланду (ICT = UTC+7).
+    # 11:00 ICT = 04:00 UTC; 02:00 ICT = 19:00 UTC. Точное окно проверяет код по Settings.
+    - cron: "*/30 4-19 * * *"
+  workflow_dispatch: {}        # ручной запуск для теста
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements.txt
+      - run: python -m src.main
+        env:
+          APIFY_TOKEN:             ${{ secrets.APIFY_TOKEN }}
+          APIFY_ACTOR_ID:          ${{ secrets.APIFY_ACTOR_ID }}
+          ANTHROPIC_API_KEY:       ${{ secrets.ANTHROPIC_API_KEY }}
+          AIRTABLE_TOKEN:          ${{ secrets.AIRTABLE_TOKEN }}
+          AIRTABLE_BASE_ID:        ${{ secrets.AIRTABLE_BASE_ID }}
+          AIRTABLE_TABLE:          Projects
+          AIRTABLE_SETTINGS_TABLE: Settings
+          TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:        ${{ secrets.TELEGRAM_CHAT_ID }}
