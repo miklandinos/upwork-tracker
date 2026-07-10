@@ -14,8 +14,11 @@ except ImportError:  # в CI dotenv не обязателен
 
 
 def _env(name: str, default: str = "") -> str:
-    value = os.environ.get(name, "")
-    return value if value.strip() else default
+    # .strip() защищает от лишних пробелов/переносов строк, которые могут
+    # попасть в значение при копипасте в GitHub Secrets — иначе requests
+    # роняет запрос с InvalidHeader на заголовке Authorization.
+    value = os.environ.get(name, "").strip()
+    return value if value else default
 
 
 APIFY_TOKEN = _env("APIFY_TOKEN")
