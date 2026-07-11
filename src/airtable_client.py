@@ -82,6 +82,7 @@ class AirtableClient:
             "Country": job.get("country"),
             "Client Spent": job.get("client_spent"),
             "Posted At": job.get("posted_at"),
+            "Bids": job.get("bids"),
             "Status": "Новый",
             "AI Confidence": ai.get("confidence"),
             "AI Reason": ai.get("reason"),

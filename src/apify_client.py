@@ -147,12 +147,65 @@ def _job_type(item: dict) -> str | None:
     return None
 
 
+def _normalize_flash_mage(item: dict) -> dict:
+    """flash_mage/upwork: полезные данные вложены в data.opening.* (схема сверена 2026-07).
+
+    ВАЖНО: верхнеуровневый item["id"] у этого актора — порядковый номер строки
+    ("0", "1", ...), НЕ id вакансии. Настоящий id — data.opening.info.ciphertext.
+    """
+    url = _first(item, "link", "url")
+    upwork_id = (
+        _nested(item, "data", "opening", "info", "ciphertext")
+        or _nested(item, "data", "opening", "info", "id")
+        or _extract_id_from_url(url)
+    )
+
+    job_type_raw = _nested(item, "data", "opening", "info", "type")  # HOURLY | FIXED
+    job_type = None
+    if job_type_raw:
+        job_type = "Hourly" if "HOUR" in str(job_type_raw).upper() else "Fixed"
+
+    budget = None
+    hourly_min = _money(_nested(item, "data", "opening", "extendedBudgetInfo", "hourlyBudgetMin"))
+    hourly_max = _money(_nested(item, "data", "opening", "extendedBudgetInfo", "hourlyBudgetMax"))
+    fixed = _nested(item, "data", "opening", "budget", "amount")
+    if hourly_min or hourly_max:
+        budget = f"${hourly_min}–${hourly_max}/hr" if hourly_min and hourly_max else f"${hourly_min or hourly_max}/hr"
+    elif isinstance(fixed, (int, float)) and fixed > 0:
+        budget = f"${_money(fixed)} (fixed)"
+
+    bids = _nested(item, "data", "opening", "clientActivity", "totalApplicants")
+
+    return {
+        # ciphertext приходит как "~02...", из URL id извлекается без тильды —
+        # нормализуем к виду без "~", чтобы дедуп всегда сходился
+        "upwork_id": str(upwork_id).lstrip("~") if upwork_id else None,
+        "title": _first(item, "title") or _nested(item, "data", "opening", "info", "title"),
+        "url": url,
+        "description": _nested(item, "data", "opening", "description") or _first(item, "description"),
+        "budget": budget,
+        "job_type": job_type,
+        "country": _nested(item, "data", "buyer", "location", "country"),
+        "client_spent": _money(_nested(item, "data", "buyer", "stats", "totalCharges")),
+        "posted_at": (
+            _nested(item, "data", "opening", "publishTime")
+            or _nested(item, "data", "opening", "postedOn")
+        ),
+        "bids": int(bids) if isinstance(bids, (int, float)) or (isinstance(bids, str) and bids.isdigit()) else None,
+    }
+
+
 def normalize_job(item: dict) -> dict:
     """Единый объект вакансии (§5 ТЗ). Отсутствующие значения — None."""
+    if isinstance(item.get("data"), dict) and isinstance(item["data"].get("opening"), dict):
+        return _normalize_flash_mage(item)
+
+    # Плоский формат (neatrat/upwork-job-scraper и подобные)
     url = _first(item, "link", "url", "jobUrl", "jobLink")
     upwork_id = _first(item, "id", "jobId", "uid", "ciphertext") or _extract_id_from_url(url)
+    bids = _first(item, "totalApplicants", "proposals", "bids", "applicants")
     return {
-        "upwork_id": str(upwork_id) if upwork_id else None,
+        "upwork_id": str(upwork_id).lstrip("~") if upwork_id else None,
         "title": _first(item, "title", "jobTitle"),
         "url": url,
         "description": _first(item, "description", "descriptionText", "snippet"),
@@ -169,4 +222,5 @@ def normalize_job(item: dict) -> dict:
         "posted_at": _first(
             item, "publishTime", "createTime", "publishedOn", "createdOn", "postedOn", "publishedDate"
         ),
+        "bids": int(bids) if isinstance(bids, (int, float)) or (isinstance(bids, str) and str(bids).isdigit()) else None,
     }

@@ -131,23 +131,52 @@ def test_pick_query_single():
 # --- нормализация выхода Apify (§5) -------------------------------------------
 
 def test_normalize_flash_mage_shape():
+    """Реальная структура flash_mage/upwork: данные вложены в data.opening.*,
+    верхнеуровневый id — порядковый номер строки (НЕ id вакансии)."""
     job = normalize_job({
-        "id": "~021234567890",
+        "id": "0",  # индекс строки — должен игнорироваться
         "title": "UE5 Archviz",
         "link": "https://www.upwork.com/jobs/~021234567890",
-        "description": "Build a virtual tour",
-        "jobType": "Hourly",
-        "publishTime": "2026-07-10T10:00:00Z",
-        "hourlyBudgetMin": 30,
-        "hourlyBudgetMax": 60,
-        "buyer": {"location": {"country": "United States"}, "stats": {"totalCharges": {"amount": 5000, "currencyCode": "USD"}}},
+        "data": {
+            "opening": {
+                "description": "Build a virtual tour",
+                "publishTime": "2026-07-10T10:00:00Z",
+                "info": {"ciphertext": "~021234567890", "id": "1234567890", "type": "HOURLY"},
+                "budget": {"amount": 0, "currencyCode": "USD"},
+                "extendedBudgetInfo": {"hourlyBudgetMin": 30, "hourlyBudgetMax": 60},
+                "clientActivity": {"totalApplicants": 27},
+            },
+            "buyer": {
+                "location": {"country": "United States"},
+                "stats": {"totalCharges": {"amount": 5000, "currencyCode": "USD"}},
+            },
+        },
     })
-    assert job["upwork_id"] == "~021234567890"
+    assert job["upwork_id"] == "021234567890"  # без тильды, не индекс строки
     assert job["job_type"] == "Hourly"
     assert job["budget"] == "$30–$60/hr"
     assert job["country"] == "United States"
     assert job["client_spent"] == "5000"
     assert job["posted_at"] == "2026-07-10T10:00:00Z"
+    assert job["bids"] == 27
+    assert job["description"] == "Build a virtual tour"
+
+
+def test_normalize_flash_mage_fixed_price():
+    job = normalize_job({
+        "id": "1",
+        "title": "Fixed job",
+        "link": "https://www.upwork.com/jobs/~02777",
+        "data": {
+            "opening": {
+                "info": {"ciphertext": "~02777", "type": "FIXED"},
+                "budget": {"amount": 500, "currencyCode": "USD"},
+            },
+        },
+    })
+    assert job["job_type"] == "Fixed"
+    assert job["budget"] == "$500 (fixed)"
+    assert job["bids"] is None
 
 
 def test_normalize_neatrat_shape_and_id_from_url():

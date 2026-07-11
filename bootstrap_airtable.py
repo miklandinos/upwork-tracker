@@ -57,6 +57,7 @@ PROJECTS_FIELDS = [
             {"name": "Удалён"},
         ]},
     },
+    {"name": "Bids", "type": "number", "options": {"precision": 0}},  # откликов на момент добавления
     {"name": "AI Confidence", "type": "number", "options": {"precision": 2}},
     {"name": "AI Reason", "type": "multilineText"},
     {"name": "Notified", "type": "checkbox", "options": {"icon": "check", "color": "greenBright"}},
