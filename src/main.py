@@ -22,7 +22,7 @@ from .airtable_client import AirtableClient
 from .apify_client import fetch_jobs
 from .classifier import CATEGORY_MAP, classify
 from .filters import passes_keyword_filter
-from .telegram import send_job_notification
+from .telegram import send_job_notification, send_status_message
 
 log = logging.getLogger(__name__)
 
@@ -102,9 +102,11 @@ def run() -> int:
     # 3. Apify: один запрос за цикл, round-robin по Search Queries
     query = pick_query(settings["search_queries"])
     jobs: list[dict] = []
+    apify_ok = True
     try:
         jobs = fetch_jobs(config.APIFY_TOKEN, config.APIFY_ACTOR_ID, query, rows=config.APIFY_ROWS)
     except Exception:
+        apify_ok = False
         log.error("Сбой Apify — пропускаю приём вакансий, продолжаю прогон", exc_info=True)
 
     # 4-6. Грубый фильтр → дедуп → Haiku → запись
@@ -164,6 +166,26 @@ def run() -> int:
         "пушей %(notified)d, удалено старых %(deleted)d",
         {**stats, "notified": notified, "deleted": deleted},
     )
+
+    # 9. Heartbeat: отметка о скане в Settings и тихое статус-сообщение в Telegram
+    if apify_ok:
+        result_text = (
+            f"получено {stats['fetched']}, новых {stats['relevant']}"
+            + (f", ошибок {stats['errors']}" if stats["errors"] else "")
+        )
+        status_line = (
+            f"🔄 Скан Upwork ({query}): {result_text}"
+            if stats["relevant"] else
+            f"🔄 Скан Upwork ({query}): {result_text} — новых проектов нет"
+        )
+    else:
+        result_text = "ошибка Apify — вакансии не получены"
+        status_line = f"⚠️ Скан Upwork ({query}): {result_text}"
+    try:
+        airtable.record_scan_status(now_local.isoformat(), result_text)
+    except Exception:
+        log.error("Не удалось записать статус скана в Settings", exc_info=True)
+    send_status_message(config.TELEGRAM_BOT_TOKEN, config.TELEGRAM_CHAT_ID, status_line)
     return 0
 
 

@@ -29,6 +29,27 @@ def format_job_message(fields: dict) -> str:
     )
 
 
+def send_status_message(bot_token: str, chat_id: str, text: str) -> bool:
+    """Служебное статус-сообщение (heartbeat) — без звука, чтобы не будить группу."""
+    try:
+        resp = requests.post(
+            API_URL.format(token=bot_token),
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+                "disable_notification": True,
+            },
+            timeout=REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        return bool(resp.json().get("ok"))
+    except Exception:
+        log.error("Не удалось отправить статус-сообщение", exc_info=True)
+        return False
+
+
 def send_job_notification(bot_token: str, chat_id: str, fields: dict) -> bool:
     """Один пуш на запись. False при ошибке — Notified не проставляется,
     пуш будет повторён на следующем прогоне."""

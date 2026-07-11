@@ -79,6 +79,9 @@ SETTINGS_FIELDS = [
     {"name": "Active End", "type": "singleLineText"},
     {"name": "Timezone", "type": "singleLineText"},
     {"name": "Retention Days", "type": "number", "options": {"precision": 0}},
+    # Heartbeat: скрипт отмечает здесь время и итог последнего скана
+    {"name": "Last Scan At", "type": "dateTime", "options": DATETIME_OPTIONS},
+    {"name": "Last Scan Result", "type": "singleLineText"},
 ]
 
 DEFAULT_SETTINGS_RECORD = {

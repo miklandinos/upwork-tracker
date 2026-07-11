@@ -13,6 +13,7 @@ class AirtableClient:
         api = Api(token)
         self.projects = api.table(base_id, table_name)
         self.settings_table = api.table(base_id, settings_table_name)
+        self._settings_record_id: str | None = None  # запоминается при load_settings
 
     # --- Settings (§3.1) ---------------------------------------------------
 
@@ -31,6 +32,7 @@ class AirtableClient:
             log.warning("Таблица Settings пуста — использую дефолты из config.py")
             return merged
 
+        self._settings_record_id = records[0]["id"]
         fields = records[0].get("fields", {})
         # Checkbox: Airtable не возвращает поле, если галочка снята → False
         merged["enabled"] = bool(fields.get("Enabled", False))
@@ -57,6 +59,17 @@ class AirtableClient:
             merged["retention_days"] = int(retention)
 
         return merged
+
+    def record_scan_status(self, scanned_at_iso: str, result_text: str) -> None:
+        """Отметка о последнем скане в строке Settings (Last Scan At / Last Scan Result)."""
+        if not self._settings_record_id:
+            log.warning("Нет записи Settings — статус скана не записан")
+            return
+        self.settings_table.update(
+            self._settings_record_id,
+            {"Last Scan At": scanned_at_iso, "Last Scan Result": result_text},
+            typecast=True,
+        )
 
     # --- Projects (§3) -----------------------------------------------------
 
